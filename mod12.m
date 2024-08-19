@@ -1,8 +1,8 @@
-% mod 11 : adding quaternion pointing 
+% mod 12 : adding pointing error using rot matrix no quats 
 load("parameters3.mat")
 %set sizes
 dt = 0.01; 
-tspan = 0:dt:10;
+tspan = 0:dt:5;
 
 global us
 us = [NaN, NaN, NaN, NaN] ;
@@ -19,15 +19,27 @@ rd_0 = [0 0 0]';
 W_0 = W_init;
 theta_0 = [t1 t2 t3 t4]'; %reactionwheel angle of rotation in b frame 
 
+
+
+%for pointing %%%%%%%%%%
+%lets add q and v as state vars
+
+%q = quaternion() = f ( theta(t))
+%v = q*vq
+
+%qdot = f(thetad) = f(w_b_n)
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 %%%%%%%%%SOLVE%%%%%%%%%%
 y0 = [ w_b_n_0 ; rd_0; W_0 ; theta_0 ];
 [t,y] = ode45(@func,tspan,y0);
 %%%%%%%%%%%%%%%%%%%%%%%%
 
 
+graph(t, y);
 
-
-graph(t, y, pointer);
+point(t, y);
 
 %%%%%%%%GRAPHS%%%%%%%%
 %figure;
@@ -45,12 +57,7 @@ graph(t, y, pointer);
 %title('Angular Momentum', 'FontSize', 14, 'FontWeight', 'bold', 'Color', 'g');
 %plot(angM)
 %hold off;
-function graph(t,y, pointer)
-figure;
-hold on;
-title('Pointing Error', 'FontSize', 14, 'FontWeight', 'bold', 'Color', 'g');
-plot(pointer(1,:), pointer(2,:),  '-g', 'DisplayName', 'Degree');
-hold off;
+function graph(t,y)
 
 figure;
 title('Space Craft Angular Velocity', 'FontSize', 14, 'FontWeight', 'bold', 'Color', 'g');
@@ -231,10 +238,10 @@ function dx = func(t,y)
     end
 
     
-    Lb = W(1)^2 * (U_d * W_frame_init1(:,2) +U_s*skew(r_w_b(:,1))*wframe_2(:,1))+ ...
-       W(2)^2 * (U_d * W_frame_init2(:,2) +U_s*skew(r_w_b(:,2))*wframe_2(:,2))+...
-       W(3)^2 * (U_d * W_frame_init3(:,2) +U_s*skew(r_w_b(:,3))*wframe_2(:,3))+...
-       W(4)^2 * (U_d * W_frame_init4(:,2) +U_s*skew(r_w_b(:,4))*wframe_2(:,4)); %(83) (84) ????????? 
+    Lb = W(1)^2 * (U_d(1) * W_frame_init1(:,2) +U_s(1)*skew(r_w_b(:,1))*wframe_2(:,1))+ ...
+       W(2)^2 * (U_d(2) * W_frame_init2(:,2) +U_s(2)*skew(r_w_b(:,2))*wframe_2(:,2))+...
+       W(3)^2 * (U_d(3) * W_frame_init3(:,2) +U_s(3)*skew(r_w_b(:,3))*wframe_2(:,3))+...
+       W(4)^2 * (U_d(4) * W_frame_init4(:,2) +U_s(4)*skew(r_w_b(:,4))*wframe_2(:,4)); %(83) (84) ????????? 
  
     tau_rhs = - skew(w_b_n) * isc_b * w_b_n - isc_b_dash * w_b_n ...
         -msc * skew(c)*(r_c_ndd - 2 * skew(w_b_n) * cdash - ...
@@ -281,12 +288,13 @@ function dx = func(t,y)
     %now rotate b frame about w by angle tstep * W_b_n
 
     %q = cos( theta /2) + w_b_n * sin(theta / 2)
-    q = quaternion([w_b_n(1) w_b_n(2) w_b_n(3) ], "eulerd", "XYZ", "point");
-    ulast = u;
-    u = rotateframe(q, [ulast(1) ulast(2) ulast(3)]);
-    angleDeg = real(rad2deg(acos(dot(u,ulast)/(norm(u) * norm(ulast)))) );
+   % q = quaternion([w_b_n(1) w_b_n(2) w_b_n(3) ], "eulerd", "XYZ", "frame");
+    %qd = quaternion( [w_b_nd(1) w_b_nd(2) w_b_nd(3) w_b_nd(4)], "eulerd", "XYZ", "frame");
+    %ulast = u;
+    %u = rotateframe(q, [ulast(1) ulast(2) ulast(3)]);
+    %angleDeg = real(rad2deg(acos(dot(u,ulast)/(norm(u) * norm(ulast)))) );
     
-    pointer = [pointer [t angleDeg]'];
+    %pointer = [pointer [t angleDeg]'];
 
     x1 = w_b_nd   ;
     x2 = r_b_ndd  ;
@@ -331,5 +339,36 @@ function v_rot = rotateg(v, ang, g)
     theta = deg2rad(ang);
 
     v_rot = dot(v, g) * g + cos(theta) * (v - dot(v, g) * g ) + sin(theta) * cross(g, v);
+
+end
+
+function point(t,y)
+%%THIS IS DEFINITELY NOT RIGHT PLS 
+    [dim ~] = size(y);
+
+    Ws = y(:,1:3);
+    zxy = [0 0 0 0]';
+    for i = 2:dim
+        %axis of rotation
+        W = Ws(i,:) / norm(Ws(i,:));
+        %angle of rotation
+        theta = ( t(i)-t(i-1) ) * norm(W) ;%%%THIS IS ALREADY RADS S^-1
+        %theta = norm(W);
+        K = skew(W);
+        %rotation matrix of theta about axis 
+        rot = eye(3) + sin(theta) * K + (1-cos(theta)) * K^2;
+        %euler angles defined by rot matrix in order z x y 
+        eul = rad2deg(rotm2eul(rot)) /60^2 * 1000;%convert to milli arcsec
+        zxy = [zxy [eul'; theta/60^2*1000 ]];
+    end
+
+    figure;
+    title('Euler Angles / MilliArcsec ', 'FontSize', 14, 'FontWeight', 'bold', 'Color', 'g');
+    hold on;
+    plot(t, zxy(1, :), '-b', 'DisplayName', 'z');
+    plot(t, zxy(2, :), '-b', 'DisplayName', 'x');
+    plot(t, zxy(3, : ), '-b', 'DisplayName', 'y');
+    plot(t, zxy(4, : ), '-g', 'DisplayName', 'y');
+    hold off;
 
 end

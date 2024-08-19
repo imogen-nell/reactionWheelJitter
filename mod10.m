@@ -3,36 +3,21 @@
 load("parameters2.mat")
 %set sizes
 dt = 0.01; 
-tspan = 0:dt:80;
+tspan = 0:dt:5;
 %%initial conditions
 w_b_n_0 = [0 0 0]'; 
 rd_0 = [0 0 0]';
 theta_0 = 0;
 W_0 = [W_init theta_0 0 ]';
+
 w2_0 = W_frame_init(:,2);
 w3_0 = W_frame_init(:,3);
 global us
 us = NaN ;
 
 y0 = [ w_b_n_0 ; rd_0; [W_init theta_0 ]'];
-[t,y] = ode45(@func,tspan,y0)
+[t,y] = ode45(@func,tspan,y0);
 
-%%POINTING 
-%%assume staring pointing dirrection [ 1 0 0]
-%[~,dim2] = size(tspan)
-
-angles = zeros(1, dim2);
-
-for i = 1:dim2-1
-    time = t(i+1) - t(i);
-    angles(i) = time * norm(y(i, 1:3));
-end
-
-figure;
-hold on;
-title('Pointing Error', 'FontSize', 14, 'FontWeight', 'bold', 'Color', 'g');
-plot(t, angles);
-hold off;
 
 %%%%%%%%GRAPHS%%%%%%%%
 figure;
