@@ -1,9 +1,9 @@
-%mod10 - same as mod 10 but with pointing error from mod 14
+%mod 10.2 mixing up LB
 load("parameters2.mat")
 
 %set sizes
 dt = 0.001; 
-tspan = 0:dt:50;
+tspan = 0:dt:5;
 
 %%initial conditions
 w_b_n_0 = [0 0 0]'; 
@@ -90,8 +90,15 @@ function dx = func(t,y)
         + w_2 * w_3 * ( J22 - J33 - mrw * d^2) - mrw * d * ...
         wframe_3' * skew(w_b_n)*skew(w_b_n) * r_w_b + us;       %(73)
 
-    Lb = W^2 * (U_d * wframe_3 + U_s * skew(r_w_b)*wframe_3);%not sure about tis thb 
+    %Lb = W^2 * (U_d * wframe_3 + U_s * skew(r_w_b)*wframe_3);%not sure about tis thb 
 
+    Lb = W^2 * ( U_s * skew(r_w_b)*wframe_3);
+    N = 10;
+    philast = 0;
+    for i = 1:N
+        Lb = Lb + U_d * W^2 * sin(2 * pi * W * t + philast + pi/2)*wframe_3;
+        philast = mod(philast + pi/2, 2* pi);
+    end
     tau_rhs = - skew(w_b_n) * isc_b * w_b_n - isc_b_dash * w_b_n ...
         -msc * skew(c)*(r_c_ndd - 2 * skew(w_b_n) * cdash - ...
         skew(w_b_n)*skew(w_b_n)*c) + mrw * d * W^2 * skew(r_wc_b) ...
